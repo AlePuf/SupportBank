@@ -65,10 +65,11 @@ function addTransactionToAccounts(date: Date, from: string, to: string, narrativ
     }
 }
 
-function parse_file(filename: string, accArr: Array<Account>) {
+function parse_csv_file(filename: string, accArr: Array<Account>) {
     const fs = require('fs');
     let lines = fs.readFileSync(filename).toString().split("\n");
     const res = lines.map((line: string) => line.split(","));
+    logger.log("info", "Opened file " + filename);
     for (let i = 1; i < res.length; i++) {
         if (res[i].length < 5) {
             logger.log("warn", "Reached end of file");
@@ -76,7 +77,7 @@ function parse_file(filename: string, accArr: Array<Account>) {
         }
         let parsedDate = moment(res[i][0], "DD/MM/YYYY");
         if (!parsedDate.isValid()) {
-            logger.log("error", "Invalid date, ignoring transaction");
+            logger.log("error", "Invalid date at line " + (i - 1).toString() + ", ignoring transaction");
             continue;
         }
         addTransactionToAccounts(parsedDate.toDate(), res[i][1], res[i][2], res[i][3], parseFloat(res[i][4]), accArr);
@@ -84,12 +85,29 @@ function parse_file(filename: string, accArr: Array<Account>) {
     }
 }
 
+function parse_json_file(filename: string, accArr: Array<Account>) {
+    const fs = require('fs');
+    let transactions = JSON.parse(fs.readFileSync(filename).toString());
+    logger.log("info", "Opened file " + filename);
+    for (let i = 0; i < transactions.length; i++) {
+        let transaction = transactions[i];
+        let parsedDate = moment(transaction["Date"]);
+        if (!parsedDate.isValid()) {
+            logger.log("error", "Invalid date at line " + i.toString() + ", ignoring transaction");
+            continue;
+        }
+        addTransactionToAccounts(parsedDate.toDate(), transaction["FromAccount"], transaction["ToAccount"], transaction["Narrative"], parseFloat(transaction["Amount"]), accArr);
+        logger.log("info", "Added transaction");
+    }
+    logger.log("warn", "Reached end of file");
+}
+
 function main(accArr: Array<Account>) {
-    parse_file('Transactions2014.csv', accArr);
-    parse_file('DodgyTransactions2015.csv', accArr);
-    logger.log("info", "Parsed both files");
+    parse_csv_file('Transactions2014.csv', accArr);
+    // parse_csv_file('DodgyTransactions2015.csv', accArr);
+    parse_json_file('Transactions2013.json', accArr);
     while (1) {
-        let command: string = readlineSync.question("Enter a command (List All, List [Account], exit): ");
+        let command: string = readlineSync.question("Enter a command (List All, List [account], Import File [filename], exit): ");
         if (command == "List All") {
             for (let i = 0; i < accArr.length; i++) {
                 if (accArr[i].balance > 0) {
@@ -113,6 +131,18 @@ function main(accArr: Array<Account>) {
             if (!found) {
                 console.log("Account does not exist!");
             }
+        } else if (command.indexOf("Import File") != -1) {
+            let name = command.substring(12);
+            let filenameSplit = name.split('.');
+            if (filenameSplit[filenameSplit.length - 1].toLowerCase() == "csv") {
+                parse_csv_file(name, accArr);
+                console.log("File imported successfully");
+            } else if (filenameSplit[filenameSplit.length - 1].toLowerCase() == "json") {
+                parse_json_file(name, accArr);
+                console.log("File imported successfully");
+            } else {
+                console.log("Unsupported file extension");
+            }
         } else if (command == "exit") {
             break;
         } else {
@@ -131,7 +161,6 @@ log4js.configure({
     }
 });
 const logger = log4js.getLogger('log');
-logger.log("debug", "proba");
 const moment = require('moment');
 let readlineSync = require('readline-sync');
 main([]);
