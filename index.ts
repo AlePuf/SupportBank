@@ -102,10 +102,28 @@ function parse_json_file(filename: string, accArr: Array<Account>) {
     logger.log("warn", "Reached end of file");
 }
 
+function parse_xml_file(filename: string, accArr: Array<Account>) {
+    const fs = require('fs');
+    let transactions = parser.parse(fs.readFileSync(filename).toString());
+    logger.log("info", "Opened file " + filename);
+    let transactionList = transactions["TransactionList"]["SupportTransaction"];
+    for (let i = 0; i < transactionList.length; i++) {
+        let transaction = transactionList[i];
+        let parsedDate = new Date((parseInt(transaction["@_Date"]) - 25568) * 86400000);
+        if (isNaN(Date.parse(parsedDate.toString()))) {
+            logger.log("error", "Invalid date at line " + i.toString() + ", ignoring transaction");
+            continue;
+        }
+        addTransactionToAccounts(parsedDate, transaction["Parties"]["From"], transaction["Parties"]["To"], transaction["Description"], parseFloat(transaction["Value"]), accArr);
+        logger.log("info", "Added transaction");
+    }
+    logger.log("warn", "Reached end of file");
+}
+
 function main(accArr: Array<Account>) {
     parse_csv_file('Transactions2014.csv', accArr);
-    // parse_csv_file('DodgyTransactions2015.csv', accArr);
     parse_json_file('Transactions2013.json', accArr);
+    parse_xml_file('Transactions2012.xml', accArr);
     while (1) {
         let command: string = readlineSync.question("Enter a command (List All, List [account], Import File [filename], exit): ");
         if (command == "List All") {
@@ -162,5 +180,10 @@ log4js.configure({
 });
 const logger = log4js.getLogger('log');
 const moment = require('moment');
+const {XMLParser} = require('fast-xml-parser');
+const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_"
+});
 let readlineSync = require('readline-sync');
 main([]);
