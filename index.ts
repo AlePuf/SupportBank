@@ -1,11 +1,11 @@
 class Transaction {
-    date: string;
+    date: Date;
     from: string;
     to: string;
     narrative: string;
     amount: number;
 
-    constructor(date: string, from: string, to: string, amount: number, narrative: string) {
+    constructor(date: Date, from: string, to: string, amount: number, narrative: string) {
         this.date = date;
         this.to = to;
         this.from = from;
@@ -23,7 +23,7 @@ class Account {
         this.name = name;
     }
 
-    addTransaction(date: string, from: string, to: string, amount: number, narrative: string) {
+    addTransaction(date: Date, from: string, to: string, amount: number, narrative: string) {
         this.transactions.push(new Transaction(date, from, to, amount, narrative));
         if (this.name == from) {
             this.balance -= amount;
@@ -40,7 +40,11 @@ class Account {
     }
 }
 
-function addTransactionToAccounts(date: string, from: string, to: string, narrative: string, amount: number, accArr: Array<Account>) {
+function addTransactionToAccounts(date: Date, from: string, to: string, narrative: string, amount: number, accArr: Array<Account>) {
+    if (isNaN(amount)) {
+        logger.log("error", "Amount invalid, ignoring transaction");
+        return;
+    }
     let foundFrom = 0, foundTo = 0;
     for (let i = 0; i < accArr.length; i++) {
         if (accArr[i].name == from) {
@@ -62,19 +66,28 @@ function addTransactionToAccounts(date: string, from: string, to: string, narrat
 }
 
 function parse_file(filename: string, accArr: Array<Account>) {
-    const csv = require('csv-parser');
     const fs = require('fs');
-    fs.createReadStream(filename)
-        .pipe(csv())
-        .on('data', (data: any) => {
-            addTransactionToAccounts(data["Date"], data["From"], data["To"], data["Narrative"], parseFloat(data["Amount"]), accArr);
-        })
-        .on('end', () => {
-            main(accArr);
-        });
+    let lines = fs.readFileSync(filename).toString().split("\n");
+    const res = lines.map((line: string) => line.split(","));
+    for (let i = 1; i < res.length; i++) {
+        if (res[i].length < 5) {
+            logger.log("warn", "Reached end of file");
+            continue;
+        }
+        let parsedDate = moment(res[i][0], "DD/MM/YYYY");
+        if (!parsedDate.isValid()) {
+            logger.log("error", "Invalid date, ignoring transaction");
+            continue;
+        }
+        addTransactionToAccounts(parsedDate.toDate(), res[i][1], res[i][2], res[i][3], parseFloat(res[i][4]), accArr);
+        logger.log("info", "Added transaction");
+    }
 }
 
 function main(accArr: Array<Account>) {
+    parse_file('Transactions2014.csv', accArr);
+    parse_file('DodgyTransactions2015.csv', accArr);
+    logger.log("info", "Parsed both files");
     while (1) {
         let command: string = readlineSync.question("Enter a command (List All, List [Account], exit): ");
         if (command == "List All") {
@@ -108,5 +121,17 @@ function main(accArr: Array<Account>) {
     }
 }
 
+const log4js = require('log4js');
+log4js.configure({
+    appenders: {
+        file: { type: 'fileSync', filename: 'logs/debug.log' }
+    },
+    categories: {
+        default: { appenders: ['file'], level: 'debug'}
+    }
+});
+const logger = log4js.getLogger('log');
+logger.log("debug", "proba");
+const moment = require('moment');
 let readlineSync = require('readline-sync');
-parse_file('Transactions2014.csv', []);
+main([]);
