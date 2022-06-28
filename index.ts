@@ -67,7 +67,7 @@ function parse_file(filename: string, accArr: Array<Account>) {
     fs.createReadStream(filename)
         .pipe(csv())
         .on('data', (data: any) => {
-            addTransactionToAccounts(data["Date"], data["From"], data["To"], data["Narrative"], parseInt(data["Amount"]), accArr);
+            addTransactionToAccounts(data["Date"], data["From"], data["To"], data["Narrative"], parseFloat(data["Amount"]), accArr);
         })
         .on('end', () => {
             main(accArr);
@@ -80,9 +80,9 @@ function main(accArr: Array<Account>) {
         if (command == "List All") {
             for (let i = 0; i < accArr.length; i++) {
                 if (accArr[i].balance > 0) {
-                    console.log(accArr[i].name + " is owed " + accArr[i].balance);
+                    console.log(accArr[i].name + " is owed " + accArr[i].balance.toFixed(2));
                 } else if (accArr[i].balance < 0) {
-                    console.log(accArr[i].name + " owes " + (-accArr[i].balance));
+                    console.log(accArr[i].name + " owes " + (-accArr[i].balance).toFixed(2));
                 } else {
                     console.log(accArr[i].name + " is settled up!");
                 }
